@@ -1,21 +1,21 @@
 services:
   backend:
     build: .
-    container_name: clubsheet-backend:latest
+    container_name: pitchwork-backend:latest
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://postgres:dede@postgres:5432/clubsheet-db?schema=build
+      DATABASE_URL: postgresql://postgres:dede@postgres:5432/pitchwork-db?schema=build
     depends_on:
       - postgres
 
   postgres:
     image: postgres:17-alpine
-    container_name: clubsheet-postgres
+    container_name: pitchwork-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: clubsheet
+      POSTGRES_DB: pitchwork
     ports:
       - "5433:5432"
     volumes:

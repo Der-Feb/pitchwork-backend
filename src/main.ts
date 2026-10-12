@@ -34,7 +34,7 @@ async function bootstrap() {
   // configure Swagger UI
   const config = new DocumentBuilder()
     .setDescription('Multi-tenant sports club management API documentation')
-    .setTitle('ClubSheet API')
+    .setTitle('Pitchwork API')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

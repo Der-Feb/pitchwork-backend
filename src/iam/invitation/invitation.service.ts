@@ -67,7 +67,7 @@ export class InvitationService {
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>You're Invited to ${clubName} on ClubSheet</title>
+                <title>You're Invited to ${clubName} on Pitchwork</title>
             </head>
             <body style="margin: 0; padding: 0; background-color: #f4f7f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
                 <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f7f5; padding: 40px 10px;">
@@ -82,13 +82,13 @@ export class InvitationService {
                                 <tr>
                                     <td style="padding: 40px 32px; text-align: center;">
                                         <!-- Header Title -->
-                                        <h1 style="margin: 0 0 16px 0; color: #065f46; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">ClubSheet</h1>
+                                        <h1 style="margin: 0 0 16px 0; color: #065f46; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">Pitchwork</h1>
                                         
                                         <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6; text-align: left;">
                                             Hello! 
                                         </p>
                                         <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6; text-align: left;">
-                                            <strong>${inviterName}</strong> has invited you to join <strong>${clubName}</strong> ${roleDescription} on ClubSheet. Click the button below to accept your invitation and set up your account:
+                                            <strong>${inviterName}</strong> has invited you to join <strong>${clubName}</strong> ${roleDescription} on Pitchwork. Click the button below to accept your invitation and set up your account:
                                         </p>
 
                                         <!-- Call To Action Button -->
@@ -122,7 +122,7 @@ export class InvitationService {
                                 <!-- Footer -->
                                 <tr>
                                     <td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #f3f4f6;">
-                                        <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} ClubSheet. All rights reserved.</p>
+                                        <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} Pitchwork. All rights reserved.</p>
                                     </td>
                                 </tr>
                             </table>
@@ -206,7 +206,7 @@ export class InvitationService {
       // send the email
       this.communicationService.sendEmail(
         invitee_email,
-        'ClubSheet Invitation',
+        'Pitchwork Invitation',
         `Invitation to ${inviterMembership.club.name}`,
         this.inviteUserHtmlBody(
           inviterMembership.person.firstName +

@@ -100,13 +100,13 @@ export class UserTokenService {
                                 <tr>
                                     <td style="padding: 40px 32px; text-align: center;">
                                         <!-- Header Title -->
-                                        <h1 style="margin: 0 0 16px 0; color: #065f46; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">ClubSheet</h1>
+                                        <h1 style="margin: 0 0 16px 0; color: #065f46; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">Pitchwork</h1>
                                         
                                         <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6; text-align: left;">
                                             Hello, <strong>${name}</strong>! 
                                         </p>
                                         <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6; text-align: left;">
-                                            Thank you for joining ClubSheet. Use the code below <strong>or</strong> click the button to verify your account:
+                                            Thank you for joining Pitchwork. Use the code below <strong>or</strong> click the button to verify your account:
                                         </p>
 
                                         <!-- The OTP Display Block -->
@@ -132,7 +132,7 @@ export class UserTokenService {
                                 <!-- Footer -->
                                 <tr>
                                     <td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #f3f4f6;">
-                                        <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} ClubSheet. All rights reserved.</p>
+                                        <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} Pitchwork. All rights reserved.</p>
                                     </td>
                                 </tr>
                             </table>
@@ -180,13 +180,13 @@ export class UserTokenService {
                             <tr>
                                 <td style="padding: 40px 32px; text-align: center;">
                                     <!-- Header Title -->
-                                    <h1 style="margin: 0 0 16px 0; color: #065f46; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">ClubSheet</h1>
+                                    <h1 style="margin: 0 0 16px 0; color: #065f46; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">Pitchwork</h1>
                                     
                                     <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6; text-align: left;">
                                         Hello, <strong>${firstName}</strong>! 
                                     </p>
                                     <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 15px; line-height: 1.6; text-align: left;">
-                                        We received a request to reset the password for your ClubSheet account. Use the code below to proceed:
+                                        We received a request to reset the password for your Pitchwork account. Use the code below to proceed:
                                     </p>
 
                                     <!-- The OTP Display Block -->
@@ -205,7 +205,7 @@ export class UserTokenService {
                             <!-- Footer -->
                             <tr>
                                 <td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #f3f4f6;">
-                                    <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} ClubSheet. All rights reserved.</p>
+                                    <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} Pitchwork. All rights reserved.</p>
                                 </td>
                             </tr>
                         </table>

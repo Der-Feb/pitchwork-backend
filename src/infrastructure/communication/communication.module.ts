@@ -15,7 +15,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           ignoreTLS: true,
           secure: false,
         },
-        defaults: { from: `"ClubSheet" <${configService.get('MAIL_FROM')}>` },
+        defaults: { from: `"Pitchwork" <${configService.get('MAIL_FROM')}>` },
       }),
     }),
   ],

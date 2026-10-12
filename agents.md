@@ -1,8 +1,8 @@
-# AGENTS.md — ClubSheet Backend Development Guide
+# AGENTS.md — Pitchwork Backend Development Guide
 
 ## Project Overview
 
-ClubSheet is a multi-tenant football club management platform designed to manage:
+Pitchwork is a multi-tenant football club management platform designed to manage:
 
 - Clubs
 - People
@@ -215,7 +215,7 @@ Historical membership information should be preserved.
 
 # Multi-Tenancy and Club Context
 
-ClubSheet is a multi-tenant system.
+Pitchwork is a multi-tenant system.
 
 Most authenticated club-scoped operations operate within an active club context.
 
@@ -318,7 +318,7 @@ Reject malformed input at the API boundary.
 
 # Authentication
 
-ClubSheet currently uses Passport-based authentication.
+Pitchwork currently uses Passport-based authentication.
 
 Authentication flow:
 
@@ -452,7 +452,7 @@ Do not manually reproduce permission checks inside controllers.
 
 # Authorization — PBAC
 
-ClubSheet uses **Permission-Based Access Control**, not simple role-only authorization.
+Pitchwork uses **Permission-Based Access Control**, not simple role-only authorization.
 
 The effective permission system is:
 
@@ -634,7 +634,7 @@ Do not leave partially completed business operations when atomicity is required.
 
 # Historical Data
 
-ClubSheet is intended to preserve organizational history.
+Pitchwork is intended to preserve organizational history.
 
 Do not casually delete:
 
@@ -753,7 +753,7 @@ When adding scheduled tasks:
 
 # Feature Architecture
 
-ClubSheet is designed around modular club features.
+Pitchwork is designed around modular club features.
 
 Current feature concepts include:
 
@@ -1121,7 +1121,7 @@ Before production deployment:
 
 # Final Rule
 
-When working on ClubSheet backend:
+When working on Pitchwork backend:
 
 > **Preserve the domain model, respect the club boundary, keep business logic inside the appropriate module, and extend existing architecture before inventing new architecture.**
 
