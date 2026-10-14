@@ -1,0 +1,24 @@
+enum ENPreferredFoot {
+  LEFT
+  RIGHT
+  BOTH
+}
+
+model Athlete {
+  id              String           @id @default(cuid())
+  clubId          String           @map("club_id")
+  membershipId    String           @map("membership_id")
+  preferredFoot   ENPreferredFoot? @map("preferred_foot")
+  naturalPosition String?          @map("natural_position")
+
+  // timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // relations
+  membership Membership @relation(fields: [membershipId, clubId], references: [id, clubId], onDelete: Cascade)
+
+  @@unique([membershipId, clubId])
+  @@index([clubId])
+  @@map("athlete_records")
+}

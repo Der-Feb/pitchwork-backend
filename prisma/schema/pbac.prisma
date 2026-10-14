@@ -9,8 +9,7 @@ enum ENPermissionAction {
 }
 
 model Permission {
-  id String @id @default(cuid(2))
-
+  id String @id @default(cuid())
   code        String @unique
   name        String
   description String
@@ -18,9 +17,11 @@ model Permission {
   module ENFeature
   action ENPermissionAction
 
+  // timestamps
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  // relations
   rolePermissions       RolePermission[]
   membershipPermissions MembershipPermission[]
 
@@ -28,7 +29,7 @@ model Permission {
 }
 
 model Role {
-  id String @id @default(cuid(2))
+  id String @id @default(cuid())
 
   code        String @unique @db.VarChar(10)
   name        String @db.VarChar(10)
@@ -36,12 +37,13 @@ model Role {
 
   isSystem Boolean @default(true) @map("is_system")
 
+  // timestamps
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  // relations
   clubId String? @map("club_id")
   club   Club?   @relation(fields: [clubId], references: [id])
-
   memberships MembershipRole[]
   permissions RolePermission[]
 
@@ -49,7 +51,7 @@ model Role {
 }
 
 model RolePermission {
-  id String @id @default(cuid(2))
+  id String @id @default(cuid())
 
   roleId String @map("role_id")
   role   Role   @relation(fields: [roleId], references: [id])
@@ -61,21 +63,33 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-model MembershipRole {
-  id String @id @default(cuid(2))
+enum ENScopeType {
+  CLUB
+  TEAM
+  OWN
+  RELATED
+  ANY
+}
 
+model MembershipRole {
+  id String @id @default(cuid())
+
+  scope ENScopeType @default(OWN)
+  scopeId   String?     @map("scope_id") // Team ID if scopeType is TEAM, otherwise null
+
+  // timestamps
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
+
+  // relations
   membershipId String     @map("membership_id")
   membership   Membership @relation(fields: [membershipId], references: [id])
-
   roleId String @map("role_id")
   role   Role   @relation(fields: [roleId], references: [id])
-
   assignedById String?     @map("assigned_by")
   assignedBy   Membership? @relation("AssignedRoles", fields: [assignedById], references: [id])
 
-  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
-
-  @@unique([membershipId, roleId])
+  @@unique([membershipId, roleId, scope, scopeId])
+  @@index([membershipId])
   @@map("membership_roles")
 }
 
@@ -85,15 +99,15 @@ enum ENMembershipPermissionAction {
 }
 
 model MembershipPermission {
-  id String @id @default(cuid(2))
+  id String @id @default(cuid())
+  action ENMembershipPermissionAction @default(REVOKE)
 
+  // relations
   membershipId String     @map("membership_id")
   membership   Membership @relation(fields: [membershipId], references: [id])
-
   permissionId String     @map("permission_id")
   permission   Permission @relation(fields: [permissionId], references: [id])
 
-  action ENMembershipPermissionAction @default(REVOKE)
 
   @@unique([membershipId, permissionId])
   @@map("membership_permissions")

@@ -1,5 +1,5 @@
 enum ENFeature {
-  IAM // Identity and Access Management
+  ACCESS // Access Control
 
   // core features
   CLUB
@@ -22,8 +22,8 @@ model Feature {
   name        String    @db.VarChar(50)
   description String?
 
-  isCore Boolean @default(false) @map("is_core")
-  isActive Boolean @default(true)  @map("is_active")  // platform-wide kill switch (unreleased/deprecated)
+  isCore   Boolean @default(false) @map("is_core")
+  isActive Boolean @default(true) @map("is_active") // platform-wide kill switch (unreleased/deprecated)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -36,6 +36,7 @@ model Feature {
 enum ENClubFeatureStatus {
   ENABLED
   DISABLED
+  SUSPENDED // Set by platform for non-payment or other issues causing to block the platform
 }
 
 model ClubFeature {
@@ -59,85 +60,4 @@ model ClubFeature {
   @@unique([clubId, featureId])
   @@index([clubId])
   @@map("club_features")
-}
-
-// -- Training Feature --
-
-enum ENTrainingStatus {
-  SCHEDULED
-  COMPLETED
-  CANCELLED
-}
-
-enum ENTrainingType {
-  PHYSICAL
-  MENTAL
-  TECHNICAL
-  TACTICAL
-}
-
-model Training {
-  id String @id @default(cuid())
-
-  clubId String @map("club_id")
-  club   Club   @relation(fields: [clubId], references: [id])
-
-  teamId String           @map("team_id")
-  team   Team             @relation(fields: [teamId], references: [id])
-  types  ENTrainingType[]
-
-  title       String?
-  description String?
-
-  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
-  endsAt   DateTime @map("ends_at") @db.Timestamptz(3)
-
-  location String?
-
-  status ENTrainingStatus @default(SCHEDULED)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  @@index([clubId])
-  @@index([teamId])
-  @@index([startsAt])
-  @@map("trainings")
-}
-
-// -- Athlete Management Feature --
-model Athlete {
-  id String @id @default(cuid())
-
-  membershipId String     @map("membership_id")
-  membership   Membership @relation(fields: [membershipId], references: [id])
-
-  teamId String @map("team_id")
-  team   Team   @relation(fields: [teamId], references: [id])
-
-  joinedAt DateTime  @default(now()) @map("joined_at") @db.Timestamptz(3)
-  leftAt   DateTime? @map("left_at") @db.Timestamptz(3)
-
-  @@unique([membershipId, teamId])
-  @@map("athletes")
-}
-
-// -- Team Management Feature --
-
-model Team {
-  id String @id @default(cuid())
-
-  clubId String @map("club_id")
-  club   Club   @relation(fields: [clubId], references: [id])
-
-  name String @db.VarChar(50)
-
-  trainings        Training[]
-  athletes         Athlete[]
-  coachAssignments CoachAssignment[]
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  @@map("teams")
 }

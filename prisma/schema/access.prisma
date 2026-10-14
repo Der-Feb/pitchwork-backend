@@ -4,50 +4,76 @@ enum ENGender {
 }
 
 model Person {
-  id             String   @id @default(cuid(2))
-  firstName      String   @map("first_name")
-  lastName       String   @map("last_name")
+  id             String   @id @default(cuid())
+  firstName      String   @map("first_name") @db.VarChar(100)
+  lastName       String   @map("last_name") @db.VarChar(100)
   gender         ENGender
   dob            DateTime @db.Date
   nationality    String
   profilePicture String?  @map("profile_picture")
 
+  // timestamps
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  profile Profile?
-
-  user        User?
+  user User?
   memberships Membership[]
 
   @@map("persons")
 }
 
+enum ENIdentifierType {
+  EMAIL
+  PHONE
+  GOOGLE
+  APPLE
+}
+
 model User {
-  id           String @id @default(cuid(2))
-  email        String @unique
-  passwordHash String @map("password_hash")
+  id              String  @id @default(cuid())
+  passwordHash    String? @map("password_hash")
+  twoFactorSecret String? @map("two_factor_secret")
 
-  isEmailVerified Boolean   @default(false) @map("is_email_verified")
-  lastLogin       DateTime? @map("last_login") @db.Timestamptz(3)
+  // boolean
+  isEmailVerified    Boolean @default(false) @map("is_email_verified")
+  isDeleted          Boolean @default(false) @map("is_deleted")
+  isTwoFactorEnabled Boolean @default(false) @map("is_two_factor_enabled")
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // timestamps
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  lastLogin DateTime? @map("last_login") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  // relations
   personId String @unique @map("person_id")
   person   Person @relation(fields: [personId], references: [id])
-
-  tokens              UserToken[]
-  acceptedInvitations Invitation[]   @relation("UserAcceptedInvitations")
-  seenNotifications   Notification[] @relation("NotificationSeenBy")
-  sentNotifications   Notification[] @relation("NotificationSentFor")
+  tokens UserToken[]
 
   @@map("users")
+}
+
+model UserIdentifier {
+  id     String           @id @default(cuid())
+  userId String           @map("user_id")
+  type   ENIdentifierType
+  value  String
+
+  // boolean
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  // timestamps
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([type, value])
+  @@map("user_identifiers")
 }
 
 enum ENUserTokenType {
   EMAIL_VERIFICATION
   CHANGE_PASSWORD
+  LOGIN_OTP // Optional addition if you use OTP login
 }
 
 enum ENUserTokenStatus {
@@ -56,115 +82,22 @@ enum ENUserTokenStatus {
 }
 
 model UserToken {
-  id   String          @id @default(cuid(2))
-  type ENUserTokenType
-  hash String          @unique
-
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
-  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
-
+  id     String            @id @default(cuid())
+  type   ENUserTokenType
+  hash   String            @unique
   status ENUserTokenStatus @default(PENDING)
 
+  // relations
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  // timestamps
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
 
   @@index([userId])
   @@map("user_tokens")
-}
-
-enum ENMembershipStatus {
-  PENDING
-  ACTIVE
-  ENDED
-}
-
-enum ENMembershipType {
-  OWNER
-  STAFF
-  ATHLETE
-  GUARDIAN
-  BOARD
-}
-
-model Membership {
-  id String @id @default(cuid(2))
-
-  status ENMembershipStatus @default(ACTIVE)
-  types  MembershipType[]
-
-  joinedAt DateTime  @map("joined_at") @db.Timestamptz(3)
-  endedAt  DateTime? @map("ended_at") @db.Timestamptz(3)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  personId String @map("person_id")
-  person   Person @relation(fields: [personId], references: [id])
-
-  clubId String @map("club_id")
-  club   Club   @relation("ClubMemberships", fields: [clubId], references: [id])
-
-  roles         MembershipRole[]
-  permissions   MembershipPermission[]
-  assignedRoles MembershipRole[]       @relation("AssignedRoles")
-
-  createdClubs    Club[]       @relation("ClubCreator")
-  sentInvitations Invitation[] @relation("MembershipSentInvitations")
-
-  athlete          Athlete[]
-  coachAssignments CoachAssignment[]
-  enabledFeatures  ClubFeature[]
-
-  @@index([personId])
-  @@index([clubId])
-  @@index([status])
-  @@map("memberships")
-}
-
-model MembershipType {
-  membershipId String     @map("membership_id")
-  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-
-  type ENMembershipType
-
-  @@unique([membershipId, type])
-  @@map("membership_types")
-}
-
-enum ENClubStatus {
-  ACTIVE
-  INACTIVE
-  DELETED
-}
-
-model Club {
-  id        String  @id @default(cuid(2))
-  name      String
-  shortName String? @map("short_name")
-  logo      String?
-  country   String
-  timezone  String  @default("UTC")
-
-  createdById String?     @map("created_by")
-  createdBy   Membership? @relation("ClubCreator", fields: [createdById], references: [id])
-
-  status ENClubStatus @default(ACTIVE)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  memberships Membership[] @relation("ClubMemberships")
-  invitations Invitation[] @relation("ClubInvitations")
-  teams       Team[]
-  trainings   Training[]
-
-  features ClubFeature[]
-  roles    Role[]
-
-  @@index([createdById])
-  @@map("clubs")
 }
 
 enum ENInvitationStatus {
@@ -173,38 +106,27 @@ enum ENInvitationStatus {
 }
 
 model Invitation {
-  id String @id @default(cuid(2))
+  id             String             @id @default(cuid())
+  email          String?            @map("email")
+  phone          String?            @map("phone")
+  tokenHash      String             @map("token_hash")
+  failedAttempts Int                @default(0) @map("failed_attempts")
+  type           ENMembershipType
+  status         ENInvitationStatus @default(PENDING)
+  teamId         String?            @map("team_id")
 
-  email String
-
-  tokenHash String @map("token_hash")
-
-  failedAttempts Int @default(0) @map("failed_attempts")
-
-  type ENMembershipType
-
-  status ENInvitationStatus @default(PENDING)
-
-  teamId String? @map("team_id")   // plain string, no FK — see note above
-
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
-  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
-
-  clubId String @map("club_id")
-  club   Club   @relation("ClubInvitations", fields: [clubId], references: [id])
-
+  // relations
   inviterId String     @map("inviter_id")
   inviter   Membership @relation("MembershipSentInvitations", fields: [inviterId], references: [id])
 
-  acceptedByUserId String? @map("accepted_by_user_id")
-  acceptedByUser   User?   @relation("UserAcceptedInvitations", fields: [acceptedByUserId], references: [id])
+  // timestamps
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  @@index([email])
+  @@index([email, phone])
   @@index([email, tokenHash, status])
-  @@index([clubId])
   @@index([expiresAt])
   @@map("invitations")
 }

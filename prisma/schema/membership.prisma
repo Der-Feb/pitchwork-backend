@@ -1,0 +1,176 @@
+enum ENClubStatus {
+  PENDING_VERIFICATION // Waiting for platform admin review/approval
+  ACTIVE // Normal operating state
+  INACTIVE // Temporarily disabled
+  SUSPENDED // Suspended by platform (e.g., payment lapse)
+}
+
+model Club {
+  id        String  @id @default(cuid())
+  name      String
+  shortName String? @map("short_name")
+  logo      String?
+  country   String
+  timezone  String  @default("UTC")
+
+  createdById String?     @unique @map("created_by")
+  createdBy   Membership? @relation("ClubCreator", fields: [createdById], references: [id])
+
+  status           ENClubStatus      @default(ACTIVE)
+  memberships      Membership[]
+  roles            Role[]
+  clubFeatures     ClubFeature[]
+  teams            Team[]
+  staffRecord      StaffRecord?      @relation(fields: [staffRecordId], references: [id])
+  coachAssignments CoachAssignment[]
+  staffRecordId    String?
+
+  @@index([createdById])
+  @@map("clubs")
+}
+
+enum ENTeamCategory {
+  ACADEMY
+  PRIMARY
+  SENIOR
+}
+
+model Team {
+  id       String         @id @default(cuid())
+  name     String
+  category ENTeamCategory @default(SENIOR)
+
+  // timestamps
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  coachAssignments CoachAssignment[]
+
+  // relations
+  clubId String @map("club_id")
+  club   Club   @relation(fields: [clubId], references: [id])
+
+  @@unique([id, clubId]) // Required for composite foreign key integrity with CoachAssignment
+  @@index([clubId])
+  @@map("teams")
+}
+
+enum ENMembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  ENDED
+}
+
+enum ENMembershipType {
+  OWNER
+  STAFF
+  ATHLETE
+  GUARDIAN
+  AGENT
+  BOARD
+}
+
+model Membership {
+  id        String             @id @default(cuid())
+  status    ENMembershipStatus @default(ACTIVE)
+  types     MembershipType[]
+  endReason String?            @map("end_reason")
+
+  // timestamps
+  joinedAt  DateTime  @map("joined_at") @db.Timestamptz(3)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // relations
+  personId              String                 @map("person_id")
+  person                Person                 @relation(fields: [personId], references: [id])
+  club                  Club                   @relation(fields: [clubId], references: [id])
+  clubId                String                 @map("club_id")
+  sentInvitations       Invitation[]           @relation("MembershipSentInvitations")
+  createdClub           Club?                  @relation("ClubCreator")
+  athleteRecord         Athlete?
+  membershipRoles       MembershipRole[]
+  membershipPermissions MembershipPermission[]
+  clubFeatures          ClubFeature[]
+  staffRecord           StaffRecord?
+  coachAssignments      CoachAssignment[]
+  assignedRoles         MembershipRole[]       @relation("AssignedRoles")
+
+  @@unique([personId, clubId])
+  @@unique([id, clubId])
+  @@index([personId])
+  @@index([clubId])
+  @@map("memberships")
+}
+
+model MembershipType {
+  membershipId String     @map("membership_id")
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  type ENMembershipType
+
+  @@unique([membershipId, type])
+  @@index([membershipId])
+  @@map("membership_types")
+}
+
+// operational records
+model StaffRecord {
+  id             String  @id @default(cuid())
+  clubId         String  @map("club_id")
+  license        String? // e.g., UEFA B License
+  specialization String? // e.g., Goalkeeping, Youth Development
+
+  // timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // relations
+  membershipId String     @map("membership_id")
+  membership   Membership @relation(fields: [membershipId, clubId], references: [id, clubId], onDelete: Cascade)
+  clubs        Club[]
+
+  @@unique([membershipId, clubId])
+  @@index([clubId])
+  @@map("staff_records")
+}
+
+enum ENCoachPosition {
+  HEAD_COACH
+  ASSISTANT_COACH
+  GOALKEEPER_COACH
+  FITNESS_COACH
+}
+
+enum ENCoachResponsibility {
+  TACTICAL
+  TECHNICAL
+  MATCHDAY_MANAGEMENT
+  PIECES
+}
+
+model CoachAssignment {
+  id String @id @default(cuid())
+
+  position         ENCoachPosition
+  responsibilities ENCoachResponsibility[] @default([])
+
+  // timestamps
+  startsAt  DateTime  @default(now()) @map("starts_at") @db.Timestamptz(3)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // relations
+  teamId       String     @map("team_id")
+  team         Team       @relation(fields: [teamId], references: [id])
+  clubId       String     @map("club_id")
+  membershipId String     @map("membership_id")
+  membership   Membership @relation(fields: [membershipId, clubId], references: [id, clubId], onDelete: Restrict, onUpdate: Cascade)
+  club         Club       @relation(fields: [clubId], references: [id])
+
+  @@index([membershipId])
+  @@index([teamId])
+  @@map("coach_assignments")
+}
