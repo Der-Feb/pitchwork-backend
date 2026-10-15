@@ -1,15 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { TActiveMembershipPayload } from '@common/guards/active-membership.guard';
-import { Club, ENAuditCategory } from '@prisma/client';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
+import { Club } from '@prisma/client';
 import { ResourceNotFoundException } from '@common/exceptions/resource-not-found';
 
 @Injectable()
 export class TeamService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   public async createTeam(
@@ -29,13 +27,6 @@ export class TeamService {
         name: teamName,
         clubId: club.id,
       },
-    });
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.TEAM,
-      action: 'create',
-      entityType: 'Team',
-      metadata: { teamId: team.id, teamName: team.name, clubId: club.id },
-      createdBy: user_id,
     });
 
     return team;
@@ -78,14 +69,6 @@ export class TeamService {
     const team = await this.prisma.team.update({
       where: { id: teamId },
       data: { name: teamName },
-    });
-
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.TEAM,
-      action: 'update',
-      entityType: 'Team',
-      metadata: { teamId: team.id, teamName: team.name, clubId: club.id },
-      createdBy: user_id,
     });
 
     return team;

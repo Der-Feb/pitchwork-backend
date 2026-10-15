@@ -1,9 +1,9 @@
-import { ENAuditCategory } from '@prisma/client';
+import { ENFeature } from '@prisma/client';
 import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CreateAuditLogDto {
-  @IsEnum(ENAuditCategory, { message: '' })
-  category!: ENAuditCategory;
+  @IsEnum(ENFeature, { message: '' })
+  category!: ENFeature;
 
   @IsString()
   action!: string;

@@ -5,12 +5,10 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { CreateClubDto, UpdateClubDto } from './club.dto';
 import { ResourceNotFoundException } from '@common/exceptions/resource-not-found';
 import {
-  ENAuditCategory,
   ENClubStatus,
   ENMembershipStatus,
   ENMembershipType,
@@ -24,7 +22,6 @@ import { TimezoneService } from '@common/timezone/timezone.service';
 @Injectable()
 export class ClubService {
   constructor(
-    private readonly auditLogsService: AuditLogsService,
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly timezoneService: TimezoneService,
@@ -187,21 +184,6 @@ export class ClubService {
       },
     });
 
-    // Create audit log with membership ID included
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.CLUB,
-      action: 'updateClub',
-      entityType: 'Club',
-      description: 'Updating the club details',
-      metadata: {
-        userId: membership.person.user?.id,
-        personId: membership.personId,
-        membershipId: membership.id,
-        clubId: club.id,
-      },
-      createdBy: membership.person.user?.id,
-    });
-
     // if the club has a logo, and we updated the logo, delete the old one
     if (data.logo && membership.club.logo) {
       this.cloudinaryService.deleteFile(membership.club.logo).catch((err) => {
@@ -236,46 +218,7 @@ export class ClubService {
    * @param membershipId
    * @param clubId
    */
-  public async archiveClub(clubId: string, membershipId: string) {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.club.update({
-        where: {
-          id: clubId,
-        },
-        data: {
-          status: ENClubStatus.DELETED,
-          memberships: {
-            updateMany: {
-              where: {
-                status: {
-                  in: [ENMembershipStatus.ACTIVE, ENMembershipStatus.PENDING],
-                },
-              },
-              data: {
-                status: ENMembershipStatus.ENDED,
-                endedAt: this.timezoneService.nowUtc(),
-              },
-            },
-          },
-        },
-      });
-
-      await tx.clubFeature.updateMany({
-        where: { clubId },
-        data: { status: ENClubFeatureStatus.DISABLED },
-      });
-
-      await this.auditLogsService.createLog(
-        {
-          category: ENAuditCategory.CLUB,
-          action: 'clubArchive',
-          metadata: { clubId, membershipId },
-          entityType: 'club',
-        },
-        tx,
-      );
-    });
-  }
+  public async archiveClub(clubId: string, membershipId: string) {}
 
   public async getClub(clubId: string) {}
 }

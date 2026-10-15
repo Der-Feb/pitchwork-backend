@@ -1,11 +1,9 @@
 import { ResourceNotFoundException } from '@common/exceptions/resource-not-found';
 import { TActiveMembershipPayload } from '@common/guards/active-membership.guard';
 import { TimezoneService } from '@common/timezone/timezone.service';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
-  ENAuditCategory,
   ENClubFeatureStatus,
   ENFeature,
 } from '@prisma/client';
@@ -14,7 +12,6 @@ import {
 export class FeatureService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditLogService: AuditLogsService,
     private readonly timezoneService: TimezoneService,
   ) {}
 
@@ -72,21 +69,6 @@ export class FeatureService {
         },
       });
 
-      await this.auditLogService.createLog(
-        {
-          category: ENAuditCategory.CLUB,
-          action: 'ENABLE_FEATURE',
-          entityType: 'ClubFeature',
-          metadata: {
-            featureCode,
-            clubId: activeMembership.clubId,
-            membershipId: activeMembership.id,
-          },
-          createdBy: activeMembership.person?.user?.id,
-        },
-        tx,
-      );
-
       return updated;
     });
   }
@@ -133,21 +115,6 @@ export class FeatureService {
           enabledById: null,
         },
       });
-
-      await this.auditLogService.createLog(
-        {
-          category: ENAuditCategory.CLUB,
-          action: 'DISABLE_FEATURE',
-          entityType: 'ClubFeature',
-          metadata: {
-            featureCode,
-            clubId: activeMembership.clubId,
-            membershipId: activeMembership.id,
-          },
-          createdBy: activeMembership.person?.user?.id,
-        },
-        tx,
-      );
 
       return updated;
     });

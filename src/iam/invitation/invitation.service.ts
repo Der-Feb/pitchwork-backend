@@ -5,11 +5,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { CommunicationService } from '@infrastructure/communication/communication.service';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { ConfigService } from '@nestjs/config';
 import { TimezoneService } from '@common/timezone/timezone.service';
 import {
-  ENAuditCategory,
   ENInvitationStatus,
   ENMembershipStatus,
   ENMembershipType,
@@ -30,7 +28,6 @@ export class InvitationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly communicationService: CommunicationService,
-    private readonly auditLogsService: AuditLogsService,
     private readonly configService: ConfigService,
     private readonly timezoneService: TimezoneService,
   ) {}
@@ -137,210 +134,7 @@ export class InvitationService {
   public async inviteUser(
     inviterMembership: TActiveMembershipPayload,
     inviteData: InviteUserDto,
-  ) {
-    const { invitee_email, type, teamId } = inviteData;
+  ) {}
 
-    if (!inviterMembership || !inviterMembership.club) {
-      throw new ResourceNotFoundException(
-        'No active club membership found for inviter.',
-        'Membership',
-      );
-    }
-
-    // ATHLETE invites must reference a real team belonging to this club.
-    let team: { id: string; name: string } | null = null;
-
-    if (type === ENMembershipType.ATHLETE) {
-      team = await this.prisma.team.findFirst({
-        where: { id: teamId, clubId: inviterMembership.clubId },
-        select: { id: true, name: true },
-      });
-
-      if (!team) {
-        throw new BadRequestException(
-          'This club has no team matching the provided teamId. Create a team before inviting an athlete.',
-        );
-      }
-    }
-
-    // find the invitee, if they already have an active membership in this club:
-    const inviteeMembership = await this.prisma.membership.findFirst({
-      where: {
-        status: ENMembershipStatus.ACTIVE,
-        clubId: inviterMembership.clubId,
-        person: {
-          user: { email: invitee_email },
-        },
-      },
-      include: {
-        club: true,
-        person: { include: { user: true } },
-      },
-    });
-
-    if (inviteeMembership)
-      throw new ConflictException(
-        `Invitee with email ${invitee_email} already has an active membership in ${inviteeMembership.club.name}`,
-      );
-
-    const { token, hash } = this.giveTokenAndHash();
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL')!;
-    const inviteUrl = `${frontendUrl}/invitation/${token}`;
-
-    // create an invitation
-    return await this.prisma.$transaction(async (tx) => {
-      await tx.invitation.create({
-        data: {
-          email: invitee_email,
-          tokenHash: hash,
-          clubId: inviterMembership.clubId,
-          inviterId: inviterMembership.id, // membership id
-          type,
-          teamId: team?.id ?? null,
-          expiresAt: this.timezoneService.futureUtc(
-            this.defaultInvitationTtlMs,
-          ),
-        },
-      });
-
-      // send the email
-      this.communicationService.sendEmail(
-        invitee_email,
-        'Pitchwork Invitation',
-        `Invitation to ${inviterMembership.club.name}`,
-        this.inviteUserHtmlBody(
-          inviterMembership.person.firstName +
-            ' ' +
-            inviterMembership.person.lastName,
-          inviterMembership.club.name,
-          inviteUrl,
-          token,
-          type,
-          team?.name ?? null,
-        ),
-      );
-
-      // create an audit log
-      await this.auditLogsService.createLog(
-        {
-          category: ENAuditCategory.AUTH,
-          action: 'invitation',
-          entityType: 'Invitation',
-          metadata: {
-            clubId: inviterMembership.clubId,
-            inviterId: inviterMembership.id,
-            inviteeEmail: invitee_email,
-            type,
-            teamId: team?.id ?? null,
-          },
-          createdBy: inviterMembership.person.user?.id,
-          description: `Sent Invitation ${invitee_email} to ${inviterMembership.club.name}`,
-        },
-        tx,
-      );
-
-      return {
-        success: true,
-        message: 'Invitation sent successfully',
-      };
-    });
-  }
-
-  public async acceptInvitation(acceptData: AcceptInvitationDto) {
-    const { token } = acceptData;
-
-    // Compute HMAC digest and look up directly — no full-table scan or Argon2 iteration
-    const secret = this.configService.getOrThrow<string>('TOKEN_HASH_SECRET');
-    const tokenHash = computeTokenHash(secret, token);
-
-    const matchedInvitation = await this.prisma.invitation.findUnique({
-      where: { tokenHash },
-    });
-
-    if (
-      !matchedInvitation ||
-      matchedInvitation.status !== ENInvitationStatus.PENDING ||
-      matchedInvitation.expiresAt <= this.timezoneService.nowUtc()
-    ) {
-      throw new ResourceNotFoundException(
-        'Invitation token is invalid or expired.',
-        'Invitation',
-      );
-    }
-
-    const userAlreadyExists = await this.prisma.user.findUnique({
-      where: { email: matchedInvitation.email },
-      include: {
-        person: { include: { memberships: true } },
-      },
-    });
-
-    if (!userAlreadyExists)
-      throw new ResourceNotFoundException(
-        'No registered account found for this email. Please register first.',
-        'User',
-      );
-
-    if (!userAlreadyExists.isEmailVerified)
-      throw new BadRequestException(
-        'User account is not verified. Please verify your email first.',
-      );
-
-    await this.prisma.$transaction(async (tx) => {
-      const newMembership = await tx.membership.create({
-        data: {
-          clubId: matchedInvitation.clubId,
-          personId: userAlreadyExists.person.id,
-          status: ENMembershipStatus.ACTIVE,
-          joinedAt: this.timezoneService.nowUtc(),
-          types: {
-            create: [{ type: matchedInvitation.type }],
-          },
-        },
-      });
-
-      // ATHLETE invitations must carry a team assignment; create the Athlete record.
-      if (matchedInvitation.type === ENMembershipType.ATHLETE) {
-        if (!matchedInvitation.teamId) {
-          throw new BadRequestException(
-            'Athlete invitation is missing a team assignment.',
-          );
-        }
-
-        await tx.athlete.create({
-          data: {
-            membershipId: newMembership.id,
-            teamId: matchedInvitation.teamId,
-            joinedAt: this.timezoneService.nowUtc(),
-          },
-        });
-      }
-
-      await tx.invitation.delete({
-        where: { id: matchedInvitation.id },
-      });
-
-      await this.auditLogsService.createLog(
-        {
-          category: ENAuditCategory.AUTH,
-          action: 'acceptInvitation',
-          entityType: 'Invitation',
-          metadata: {
-            id: matchedInvitation.id,
-            membershipId: newMembership.id,
-            clubId: matchedInvitation.clubId,
-            teamId: matchedInvitation.teamId ?? null,
-          },
-          createdBy: userAlreadyExists.id,
-          description: `Accepted Invitation ${matchedInvitation.email}`,
-        },
-        tx,
-      );
-    });
-
-    return {
-      success: true,
-      message: 'Invitation accepted successfully',
-    };
-  }
+  public async acceptInvitation(acceptData: AcceptInvitationDto) {}
 }

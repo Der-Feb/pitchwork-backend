@@ -4,10 +4,9 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { TActiveMembershipPayload } from '@common/guards/active-membership.guard';
 import { parsePrismaError } from '@common/utils/error-handler';
-import { ENAuditCategory, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { ResourceNotFoundException } from '@common/exceptions/resource-not-found';
 import { CreateRoleDto, UpdateRoleDto } from './role.dto';
 import { UpdateClubDto } from '@clubs/club/club.dto';
@@ -16,7 +15,6 @@ import { UpdateClubDto } from '@clubs/club/club.dto';
 export class RoleService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   public async getRolesInClub(clubId: string) {
@@ -27,31 +25,7 @@ export class RoleService {
     });
   }
 
-  public async getRole(role_id: string, clubId: string, membershipId: string) {
-    const role = await this.prisma.role.findUnique({
-      where: { id: role_id },
-    });
-
-    if (!role) throw new ResourceNotFoundException('Role not found', 'role');
-
-    if (!role.isSystem)
-      if (role.clubId !== clubId)
-        throw new BadRequestException('Role does not belong to the club');
-
-    const membershipRole = await this.prisma.membershipRole.findUnique({
-      where: {
-        membershipId_roleId: {
-          membershipId,
-          roleId: role_id,
-        },
-      },
-    });
-
-    if (!membershipRole)
-      throw new BadRequestException('Role is not assigned to you');
-
-    return { ...role, ...membershipRole };
-  }
+  public async getRole(role_id: string, clubId: string, membershipId: string) {}
 
   public async updatedClubRole(
     role_id: string,
@@ -72,14 +46,6 @@ export class RoleService {
       data: { name, description },
     });
 
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'updateRole',
-      entityType: 'Role',
-      metadata: { roleId: role_id },
-      createdBy: user_id,
-    });
-
     return updatedRole;
   }
 
@@ -88,62 +54,7 @@ export class RoleService {
     targetMembershipId: string,
     roleCode: string,
     user_id: string,
-  ) {
-    const targetMembership = await this.prisma.membership.findUnique({
-      where: { id: targetMembershipId },
-    });
-    if (!targetMembership)
-      throw new ResourceNotFoundException(
-        'Target membership not found',
-        'membership',
-      );
-
-    const role = await this.prisma.role.findUnique({
-      where: { code: roleCode },
-    });
-    if (!role) throw new ResourceNotFoundException('Role not found', 'role');
-
-    if (!role.isSystem)
-      if (role.clubId !== adminMembership.clubId)
-        throw new BadRequestException('Role does not belong to the club');
-
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.membershipRole.upsert({
-          where: {
-            membershipId_roleId: {
-              membershipId: targetMembershipId,
-              roleId: role.id,
-            },
-          },
-          create: {
-            membershipId: targetMembershipId,
-            roleId: role.id,
-            assignedById: adminMembership.id,
-          },
-          update: {},
-        });
-
-        await this.auditLogsService.createLog(
-          {
-            category: ENAuditCategory.AUTH,
-            action: 'assignRole',
-            entityType: 'Role, Membership',
-            metadata: {
-              roleCode,
-              targetMembershipId,
-              adminMembershipId: adminMembership.id,
-            },
-            createdBy: user_id,
-          },
-          tx,
-        );
-      });
-      return true;
-    } catch (error) {
-      throw new InternalServerErrorException(parsePrismaError(error));
-    }
-  }
+  ) {}
 
   public async revokeRole(
     adminMembership: TActiveMembershipPayload,
@@ -178,21 +89,6 @@ export class RoleService {
             roleId: role.id,
           },
         });
-
-        await this.auditLogsService.createLog(
-          {
-            category: ENAuditCategory.AUTH,
-            action: 'revokeRole',
-            entityType: 'Role, Membership',
-            metadata: {
-              roleCode,
-              targetMembershipId,
-              adminMembershipId: adminMembership.id,
-            },
-            createdBy: user_id,
-          },
-          tx,
-        );
       });
       return true;
     } catch (error) {
@@ -222,14 +118,6 @@ export class RoleService {
       },
     });
 
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'createRole',
-      entityType: 'Role',
-      metadata: { roleCode, clubId },
-      createdBy: user_id,
-    });
-
     return role;
   }
 
@@ -244,14 +132,6 @@ export class RoleService {
       throw new BadRequestException('Role does not belong to the club');
 
     await this.prisma.role.delete({ where: { id: roleId } });
-
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'deleteRole',
-      entityType: 'Role',
-      metadata: { roleId, clubId },
-      createdBy: user_id,
-    });
 
     return role;
   }

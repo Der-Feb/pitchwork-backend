@@ -13,7 +13,6 @@ import { JwtService } from '@nestjs/jwt';
 import { TPayload, TUserData } from './auth.types';
 import { Response } from 'express';
 import { ResourceNotFoundException } from '@common/exceptions/resource-not-found';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { TimezoneService } from '@common/timezone/timezone.service';
 
 export type TUserWithPerson = Prisma.UserGetPayload<{
@@ -25,21 +24,15 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly auditLogsService: AuditLogsService,
     private readonly timezoneService: TimezoneService,
   ) {}
-
-  private async ensurePersonAccountExists(email: string) {
-    if (await this.prisma.user.findUnique({ where: { email } })) return true;
-    return false;
-  }
 
   public returnSanitizedUserData(user: TUserWithPerson): TUserData {
     return {
       user_id: user.id,
       person_id: user.person.id,
       name: `${user.person.firstName} ${user.person.lastName}`,
-      email: user.email,
+      email: "",
       isEmailVerified: user.isEmailVerified,
     };
   }
@@ -51,11 +44,7 @@ export class AuthService {
    * @returns
    */
   public async registerUserPerson(registerDto: RegisterUserPersonDto) {
-    if (await this.ensurePersonAccountExists(registerDto.email)) {
-      throw new ConflictException(
-        'Person with that email account already exists',
-      );
-    }
+    const { email, phone } = registerDto;
 
     const hashedPassword = await argon2.hash(registerDto.password);
 
@@ -63,7 +52,6 @@ export class AuthService {
       const newUser = await this.prisma.$transaction(async (tx) => {
         return await tx.user.create({
           data: {
-            email: registerDto.email,
             passwordHash: hashedPassword,
             person: {
               create: {
@@ -104,28 +92,7 @@ export class AuthService {
   }
 
   public async validateCredentials(loginDto: LoginDto) {
-    // Validate DTO structure first to ensure we have required fields
-    if (!loginDto || !loginDto.email || !loginDto.password) {
-      throw new UnauthorizedException('Email and password are required');
-    }
-
-    // Trim whitespace from inputs
-    const email = loginDto.email.trim().toLowerCase();
-    const password = loginDto.password.trim();
-
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { person: true },
-    });
-
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-
     try {
-      const validPassword = await argon2.verify(user.passwordHash, password);
-
-      if (!validPassword) {
-        throw new UnauthorizedException('Invalid credentials');
-      }
     } catch (error) {
       // If it's already an UnauthorizedException, rethrow it
       if (error instanceof UnauthorizedException) {
@@ -134,8 +101,6 @@ export class AuthService {
       // For any other error from argon2, treat as invalid credentials
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    return this.returnSanitizedUserData(user);
   }
 
   private async updateLastLogin(user: User) {

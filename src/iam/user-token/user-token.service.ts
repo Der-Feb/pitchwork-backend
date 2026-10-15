@@ -1,9 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommunicationService } from '@infrastructure/communication/communication.service';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
-import { ENAuditCategory, ENUserTokenType } from '@prisma/client';
+import { ENUserTokenType } from '@prisma/client';
 import { ResourceNotFoundException } from '@common/exceptions/resource-not-found';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { maskEmail } from '@common/utils/string-func';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -18,7 +17,6 @@ export class UserTokenService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly communicationService: CommunicationService,
-    private readonly auditLogsService: AuditLogsService,
     private readonly configService: ConfigService,
     private readonly timezoneService: TimezoneService,
   ) {}
@@ -221,288 +219,17 @@ export class UserTokenService {
    * Generate a 6-char OTP, store its HMAC hash, and email the code + magic link to the user.
    */
   public async sendVerifyEmail(email: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { person: true },
-    });
-    if (!user) throw new ResourceNotFoundException('User not found', 'User');
-    if (user.isEmailVerified)
-      throw new BadRequestException('User email is already verified');
-    const userId = user.id;
-
-    // rate limiter of tokens the user can send
-    const tokenCountInWindow = await this.prisma.userToken.findMany({
-      where: {
-        userId,
-        type: ENUserTokenType.EMAIL_VERIFICATION,
-        createdAt: { gte: this.timezoneService.futureUtc(-this.fiveMinutes) },
-      },
-    });
-    // If they hit the limit, lock them out early
-    if (tokenCountInWindow.length >= 3) {
-      throw new BadRequestException(
-        'You have requested too many verification codes. Please check your inbox or wait 5 minutes before trying again.',
-      );
-    }
-
-    const { otp, hash } = this.giveOtpAndHash();
-    const magicLink = this.buildMagicLink('verify-email', user.email, otp);
-    let disruptedTokensCount = 0;
-
-    // transaction based token creation and email sending
-    await this.prisma.$transaction(async (tx) => {
-      // delete previous outstanding tokens for this user + type
-      const deleteResult = await tx.userToken.deleteMany({
-        where: {
-          userId,
-          type: ENUserTokenType.EMAIL_VERIFICATION,
-        },
-      });
-
-      disruptedTokensCount = deleteResult.count;
-
-      await tx.userToken.create({
-        data: {
-          hash,
-          type: ENUserTokenType.EMAIL_VERIFICATION,
-          expiresAt: this.timezoneService.futureUtc(this.fiveMinutes),
-          userId: userId,
-        },
-      });
-
-      // when send email fails, the exception rolls back the transaction
-      await this.communicationService.sendEmail(
-        user.email,
-        'Email Verification',
-        `Hello, ${user.person.firstName}!`,
-        this.verifyEmailHtmlBody(user.person.firstName, otp, magicLink),
-      );
-    });
-
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'sendVerifyEmail',
-      entityType: 'UserToken',
-      metadata: { userId },
-      description: `Verification email dispatched successfully. Disrupted ${disruptedTokensCount} outstanding active user tokens.`,
-      createdBy: user.id,
-    });
-
-    return {
-      success: true,
-      message: 'Verification email sent successfully',
-      details: `Check your email ${maskEmail(user.email)}, the OTP expires in 5 minutes`,
-    };
   }
 
 
-  public async verifyEmail(email: string, token: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { person: true },
-    });
-    if (!user) throw new ResourceNotFoundException('User not found', 'User');
-    if (user.isEmailVerified)
-      throw new BadRequestException('User email is already verified');
+  public async verifyEmail(email: string, token: string) {}
 
-    const userId = user.id;
-
-    // Compute HMAC digest and look up directly — no iteration needed
-    const secret = this.configService.getOrThrow<string>('TOKEN_HASH_SECRET');
-    const tokenHash = computeTokenHash(secret, token);
-
-    const tokenRecord = await this.prisma.userToken.findUnique({
-      where: { hash: tokenHash },
-    });
-
-    if (
-      !tokenRecord ||
-      tokenRecord.userId !== userId ||
-      tokenRecord.type !== ENUserTokenType.EMAIL_VERIFICATION ||
-      tokenRecord.expiresAt < this.timezoneService.nowUtc()
-    ) {
-      throw new BadRequestException('Token is invalid or is expired');
-    }
-
-    let usedTokens = 0;
-    await this.prisma.$transaction(async (tx) => {
-      // Delete all email verification tokens for this user
-      const usedTokensResult = await tx.userToken.deleteMany({
-        where: {
-          userId: user.id,
-          type: ENUserTokenType.EMAIL_VERIFICATION,
-        },
-      });
-      usedTokens = usedTokensResult.count;
-
-      // Mark user as verified
-      await tx.user.update({
-        where: { id: userId },
-        data: { isEmailVerified: true },
-      });
-    });
-
-    // save the audit log,
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'verifyEmail',
-      entityType: 'User, UserToken',
-      metadata: { userId },
-      description: `User email verified successfully after using ${usedTokens} user tokens`,
-      createdBy: user.id,
-    });
-
-    return {
-      success: true,
-      message: 'Email verification successful',
-    };
-  }
-
-  public async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { person: true },
-    });
-
-    if (!user)
-      throw new ResourceNotFoundException(
-        'User not found with this email',
-        'User',
-      );
-
-    const tokenCountInWindow = await this.prisma.userToken.findMany({
-      where: {
-        userId: user.id,
-        type: ENUserTokenType.CHANGE_PASSWORD,
-        createdAt: { gte: this.timezoneService.futureUtc(-this.fiveMinutes) },
-      },
-    });
-
-    if (tokenCountInWindow.length >= 3) {
-      throw new BadRequestException(
-        'You have requested too many password reset codes. Please check your inbox or wait 5 minutes before trying again.',
-      );
-    }
-
-    const { otp, hash } = this.giveOtpAndHash();
-
-    // For password reset, a magic link only makes sense when a frontend URL is
-    // configured — the frontend must collect the new password before calling the API.
-    // Without FRONTEND_URL we send only the OTP code.
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    const resetMagicLink = frontendUrl
-      ? this.buildMagicLink('reset-password', user.email, otp)
-      : null;
-
-    let disruptedCount = 0;
-
-    // Atomic Transaction
-    await this.prisma.$transaction(async (tx) => {
-      // Hard-delete previous outstanding reset tokens to disrupt them completely
-      const deleteResult = await tx.userToken.deleteMany({
-        where: {
-          userId: user.id,
-          type: ENUserTokenType.CHANGE_PASSWORD,
-        },
-      });
-      disruptedCount = deleteResult.count;
-
-      // Save the active token
-      await tx.userToken.create({
-        data: {
-          hash,
-          type: ENUserTokenType.CHANGE_PASSWORD,
-          expiresAt: this.timezoneService.futureUtc(this.fiveMinutes),
-          userId: user.id,
-        },
-      });
-
-      // Roll back entirely if email sending fails
-      await this.communicationService.sendEmail(
-        user.email,
-        'Reset Your Password',
-        `Hello, ${user.person.firstName}!`,
-        this.resetPasswordHtmlBody(user.person.firstName, otp, resetMagicLink),
-      );
-    });
-
-    // Save the Audit Log for request tracking
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'forgotPasswordRequest',
-      entityType: 'UserToken',
-      metadata: { userId: user.id },
-      description: `Password reset requested. Disrupted ${disruptedCount} historical active reset tokens.`,
-      createdBy: user.id,
-    });
-
-    return {
-      success: true,
-      message: 'Password reset code sent successfully',
-      details: `Check your email ${maskEmail(user.email)}, the OTP expires in 5 minutes`,
-    };
-  }
+  public async forgotPassword(email: string) {}
 
 
   public async resetPassword(dto: {
     email: string;
     token: string;
     newPassword: string;
-  }) {
-    const { email, token, newPassword } = dto;
-
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new ResourceNotFoundException('User not found', 'User');
-
-    // Compute HMAC digest and look up directly — no iteration needed
-    const secret = this.configService.getOrThrow<string>('TOKEN_HASH_SECRET');
-    const tokenHash = computeTokenHash(secret, token);
-
-    const tokenRecord = await this.prisma.userToken.findUnique({
-      where: { hash: tokenHash },
-    });
-
-    if (
-      !tokenRecord ||
-      tokenRecord.userId !== user.id ||
-      tokenRecord.type !== ENUserTokenType.CHANGE_PASSWORD ||
-      tokenRecord.expiresAt < this.timezoneService.nowUtc()
-    ) {
-      throw new BadRequestException('Token is invalid or has expired');
-    }
-
-    const hashedNewPassword = await argon2.hash(newPassword);
-    let clearedTokensCount = 0;
-
-    await this.prisma.$transaction(async (tx) => {
-      const deleteResult = await tx.userToken.deleteMany({
-        where: {
-          userId: user.id,
-          type: ENUserTokenType.CHANGE_PASSWORD,
-        },
-      });
-      clearedTokensCount = deleteResult.count;
-
-      await tx.user.update({
-        where: { id: user.id },
-        data: { passwordHash: hashedNewPassword },
-      });
-    });
-
-    // Fire the Audit Log tracking
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'resetPasswordComplete',
-      entityType: 'User, UserToken',
-      metadata: { userId: user.id },
-      description: `User password reset completed successfully. Purged ${clearedTokensCount} associated tokens from data layer.`,
-      createdBy: user.id,
-    });
-
-    return {
-      success: true,
-      message:
-        'Password updated successfully. You can now log in with your new credentials.',
-    };
-  }
+  }) {}
 }

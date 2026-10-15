@@ -9,10 +9,9 @@ import {
 import {
   ENMembershipStatus,
   ENMembershipType,
-  ENAuditCategory,
+  ENFeature,
 } from '@prisma/client';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { TActiveMembershipPayload } from '@common/guards/active-membership.guard';
 import { TimezoneService } from '@common/timezone/timezone.service';
 
@@ -20,7 +19,6 @@ import { TimezoneService } from '@common/timezone/timezone.service';
 export class MembershipService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly AuditLogService: AuditLogsService,
     private readonly timezoneService: TimezoneService,
   ) {}
 
@@ -71,22 +69,6 @@ export class MembershipService {
           include: { types: true },
         });
 
-        await this.AuditLogService.createLog(
-          {
-            category: ENAuditCategory.MEMBERSHIP,
-            action: 'CREATE',
-            entityType: 'Membership',
-            description: 'Membership created successfully.',
-            metadata: {
-              membershipId: createdMembership.id,
-              personId,
-              clubId,
-              types,
-            },
-          },
-          tx,
-        );
-
         return createdMembership;
       });
     } catch (error) {
@@ -119,34 +101,6 @@ export class MembershipService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const membershipUpdate = await tx.membership.update({
-          where: { id: membershipId },
-          data: {
-            status: ENMembershipStatus.ENDED,
-            endedAt: this.timezoneService.nowUtc(),
-          },
-        });
-
-        await tx.athlete.updateMany({
-          where: { membershipId, leftAt: null },
-          data: { leftAt: this.timezoneService.nowUtc() },
-        });
-
-        await this.AuditLogService.createLog(
-          {
-            category: ENAuditCategory.MEMBERSHIP,
-            action: 'END',
-            entityType: 'Membership',
-            description: 'Membership ended successfully.',
-            metadata: { membershipId, clubId: targetMembership.clubId },
-            createdBy: actingMembership.person?.user?.id,
-          },
-          tx,
-        );
-
-        return membershipUpdate;
-      });
     } catch (error) {
       throw new InternalServerErrorException(parsePrismaError(error));
     }

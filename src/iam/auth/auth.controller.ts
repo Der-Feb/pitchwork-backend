@@ -19,8 +19,6 @@ import {
 } from '@common/guards/passport.guard';
 import { CurrentUser } from '@common/decorators/current-user';
 import { TPayload, TUserData } from './auth.types';
-import { ENAuditCategory } from '@prisma/client';
-import { AuditLogsService } from '@infrastructure/audit-logs/audit-logs.service';
 import { UserTokenService } from '../user-token/user-token.service';
 import {
   ForgotPasswordDto,
@@ -33,7 +31,6 @@ import {
 export class AuthController {
   constructor(
     private authService: AuthService,
-    private auditLogsService: AuditLogsService,
     private userTokenService: UserTokenService,
   ) {}
 
@@ -52,14 +49,6 @@ export class AuthController {
       },
       res,
     );
-
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'authRegister',
-      entityType: 'User, Person',
-      createdBy: userData.user_id,
-      metadata: { person_id: userData.person_id, user_id: userData.person_id },
-    });
 
     return {
       message: 'Registered successfully',
@@ -82,14 +71,6 @@ export class AuthController {
       },
       res,
     );
-
-    await this.auditLogsService.createLog({
-      category: ENAuditCategory.AUTH,
-      action: 'authLogin',
-      entityType: 'User',
-      createdBy: userData.user_id,
-      metadata: { user_id: userData.user_id },
-    });
 
     return {
       message: 'Logged in Successfully',

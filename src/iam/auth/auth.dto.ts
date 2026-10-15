@@ -8,6 +8,8 @@ import {
   MaxDate,
   IsEnum,
   IsISO31661Alpha2,
+  ValidateIf,
+  IsPhoneNumber,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import * as nationalities from 'i18n-nationality';
@@ -55,11 +57,18 @@ export class RegisteringPersonDto {
 }
 
 export class RegisterUserDto {
+  @ValidateIf(o => !o.phone || o.email)
   @Transform(({ value }: { value: string  }) => value?.trim().toLowerCase())
+  @IsString()
   @IsEmail()
-  email!: string;
+  email?: string;
 
+  @ValidateIf(o => !o.email || o.phone)
   @Transform(({ value }: { value: string  }) => value?.trim().toLowerCase())
+  @IsString()
+  @IsPhoneNumber(undefined, { message: 'Invalid Phone Number' })
+  phone?: string;
+
   @IsString()
   @MinLength(5)
   password!: string;

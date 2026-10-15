@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { generateAuditDescription } from './audit.utils';
-import { ENAuditCategory, Prisma } from '@prisma/client';
+import { ENFeature, Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuditLogsService {
@@ -9,7 +9,7 @@ export class AuditLogsService {
 
   async createLog(
     params: {
-      category: ENAuditCategory;
+      category: ENFeature;
       action: string;
       entityType: string;
       metadata: Record<string, any>;
@@ -23,16 +23,5 @@ export class AuditLogsService {
     const description =
       params.description ?? generateAuditDescription(action, metadata);
     const db = tx ?? this.prisma;
-
-    return await db.auditLog.create({
-      data: {
-        category,
-        action,
-        entityType,
-        description,
-        metadata,
-        createdBy,
-      },
-    });
   }
 }
