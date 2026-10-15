@@ -11,12 +11,12 @@ import { createHmac, randomBytes } from 'crypto';
  * @param secret - TOKEN_HASH_SECRET from environment. Must not be the JWT secret.
  */
 export function generateApplicationToken(secret: string): {
-  token: string;
-  hash: string;
+    token: string;
+    hash: string;
 } {
-  const token = randomBytes(32).toString('base64url');
-  const hash = computeTokenHash(secret, token);
-  return { token, hash };
+    const token = randomBytes(32).toString('base64url');
+    const hash = computeTokenHash(secret, token);
+    return { token, hash };
 }
 
 /**
@@ -32,9 +32,9 @@ export function generateApplicationToken(secret: string): {
  * @param secret - TOKEN_HASH_SECRET from environment. Must not be the JWT secret.
  */
 export function generateOtp(secret: string): { otp: string; hash: string } {
-  const otp = randomBytes(3).toString('hex').toUpperCase(); // exactly 6 hex chars
-  const hash = computeTokenHash(secret, otp);
-  return { otp, hash };
+    const otp = randomBytes(3).toString('hex').toUpperCase(); // exactly 6 hex chars
+    const hash = computeTokenHash(secret, otp);
+    return { otp, hash };
 }
 
 /**
@@ -45,5 +45,5 @@ export function generateOtp(secret: string): { otp: string; hash: string } {
  * @param rawToken - The plain token received from the user (OTP or long token).
  */
 export function computeTokenHash(secret: string, rawToken: string): string {
-  return createHmac('sha256', secret).update(rawToken).digest('hex');
+    return createHmac('sha256', secret).update(rawToken).digest('hex');
 }
