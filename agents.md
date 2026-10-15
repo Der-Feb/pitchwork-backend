@@ -1118,6 +1118,13 @@ Before production deployment:
 - Critical business workflows must have automated tests.
 
 ---
+# Schema Changing
+
+When you have finished editing the schema
+
+**First run the `npx prisma validate` command to make sure that it will not cause nay problem**
+
+---
 
 # Final Rule
 
