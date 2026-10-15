@@ -33,7 +33,9 @@ enum ENIdentifierType {
 model User {
   id              String  @id @default(cuid())
   passwordHash    String? @map("password_hash")
-  twoFactorSecret String? @map("two_factor_secret")
+  twoFactorSecret String? @map("two_factor_secret") // AES-256-GCM ciphertext, never the raw secret
+
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
 
   // boolean
   isEmailVerified    Boolean @default(false) @map("is_email_verified")
@@ -45,18 +47,21 @@ model User {
   lastLogin DateTime? @map("last_login") @db.Timestamptz(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(3)
 
   // relations
   personId String @unique @map("person_id")
   person   Person @relation(fields: [personId], references: [id])
   tokens UserToken[]
+  sessions Session[]
+  recoveryCodes RecoveryCode[]
+  identifiers UserIdentifier[]
 
   @@map("users")
 }
 
 model UserIdentifier {
   id     String           @id @default(cuid())
-  userId String           @map("user_id")
   type   ENIdentifierType
   value  String
 
@@ -68,6 +73,11 @@ model UserIdentifier {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  // relations
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@unique([type, value])
   @@map("user_identifiers")
 }
@@ -88,6 +98,7 @@ model UserToken {
   type   ENUserTokenType
   hash   String            @unique
   status ENUserTokenStatus @default(PENDING)
+  attempts Int @default(0)
 
   // relations
   userId String @map("user_id")
@@ -98,7 +109,7 @@ model UserToken {
   expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
   usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
 
-  @@index([userId])
+  @@index([userId, type, status])
   @@map("user_tokens")
 }
 
@@ -131,4 +142,53 @@ model Invitation {
   @@index([email, tokenHash, status])
   @@index([expiresAt])
   @@map("invitations")
+}
+
+model Session {
+  id        String  @id @default(cuid())
+  userAgent String? @map("user_agent")
+  ip        String? @db.VarChar(45)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  userId        String         @map("user_id")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id   String @id @default(cuid())
+  hash String @unique
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+
+  sessionId String  @map("session_id")
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model RecoveryCode {
+  id       String    @id @default(cuid())
+  codeHash String    @map("code_hash")
+  usedAt   DateTime? @map("used_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("recovery_codes")
 }
