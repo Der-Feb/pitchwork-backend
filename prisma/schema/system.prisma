@@ -1,0 +1,24 @@
+enum ENAuditLogResult {
+  SUCCESS
+  DENIED
+}
+
+model AuditLog {
+  id          String          @id @default(cuid(2))
+  category    ENFeature
+  action      String
+  result      ENAuditLogResult
+  description String
+  entityType  String          @map("entity_type")
+  entityId    String          @map("entity_id")
+
+  metadata Json?
+  doneById String?  @default("system") @map("created_by")
+
+  // timestamp
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([entityType, doneById])
+  @@map("audit_logs")
+}

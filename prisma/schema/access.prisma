@@ -17,6 +17,8 @@ model Person {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   user User?
   memberships Membership[]
+  athleteRelations   PersonRelation[] @relation("AthleteRelations")
+  relatedPersonLinks PersonRelation[] @relation("RelatedPersonLinks")
 
   @@map("persons")
 }

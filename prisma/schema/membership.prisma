@@ -24,6 +24,11 @@ model Club {
   staffRecord      StaffRecord?      @relation(fields: [staffRecordId], references: [id])
   coachAssignments CoachAssignment[]
   staffRecordId    String?
+  personRelations PersonRelation[]
+
+  // timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([createdById])
   @@map("clubs")
@@ -115,6 +120,36 @@ model MembershipType {
   @@map("membership_types")
 }
 
+enum ENRelationType {
+  GUARDIAN
+  AGENT
+}
+
+model PersonRelation {
+  id              String         @id @default(cuid())
+  relationType    ENRelationType @map("relation_type")
+  createdVia      String?        @map("created_via")
+
+  // timestamp
+  endedAt         DateTime?      @map("ended_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // relations
+  clubId          String         @map("club_id")
+  club          Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  personId        String         @map("person_id")        // The athlete
+  person        Person @relation("AthleteRelations", fields: [personId], references: [id], onDelete: Cascade)
+  relatedPersonId String         @map("related_person_id") // The guardian or agent
+  relatedPerson Person @relation("RelatedPersonLinks", fields: [relatedPersonId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, personId, relatedPersonId, relationType])
+  @@index([clubId])
+  @@index([personId])
+  @@index([relatedPersonId])
+  @@map("person_relations")
+}
+
 // operational records
 model StaffRecord {
   id             String  @id @default(cuid())
@@ -174,3 +209,4 @@ model CoachAssignment {
   @@index([teamId])
   @@map("coach_assignments")
 }
+
